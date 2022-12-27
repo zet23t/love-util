@@ -1,4 +1,9 @@
+---@class object
 local object = {}
+
+---creates a new instance
+---@param t table|nil to use as instance
+---@return object
 function object:create(t)
 	local s = setmetatable(t or {}, self._mt)
 	return s

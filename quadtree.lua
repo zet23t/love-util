@@ -1,5 +1,5 @@
 local inrange2d = require "love-math.inrange2d"
----@class quadtree
+---@class quadtree : object
 local quadtree = require "love-util.class" "quadtree"
 
 ---@param min_x number
