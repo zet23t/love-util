@@ -1,4 +1,5 @@
 ---@class object
+---@field _mt table
 local object = {}
 
 ---creates a new instance
@@ -21,11 +22,14 @@ function object:extends(base)
 	return self
 end
 
-
+local class_registry = require "love-util.class_registry"
 
 return function(name)
 	local c = setmetatable({ class_name = name or "unnamed_class" }, { __index = object, __tostring = function(self) return self:tostr() end })
 	c.class_type = c
-	c._mt = { __index = c}
+	c._mt = { __index = c; class_name = name}
+	assert(not class_registry[name])
+	class_registry[name] = c._mt
+	class_registry[c._mt] = name
 	return c
 end
