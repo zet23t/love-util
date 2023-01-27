@@ -28,7 +28,7 @@ return function(name)
 	local c = setmetatable({ class_name = name or "unnamed_class" }, { __index = object, __tostring = function(self) return self:tostr() end })
 	c.class_type = c
 	c._mt = { __index = c; class_name = name}
-	assert(not class_registry[name])
+	assert(not class_registry[name], "name registered already: "..name)
 	class_registry[name] = c._mt
 	class_registry[c._mt] = name
 	return c
