@@ -29,7 +29,9 @@ local function reload_all()
 		end
 	end
 	dofile "main.lua"
-	love.load()
+	if love.load then
+		love.load()
+	end
 	STOP_ALL = false
 end
 
