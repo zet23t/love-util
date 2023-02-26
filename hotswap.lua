@@ -144,6 +144,7 @@ function love.run()
 				safecall(love.draw)
 			end
 
+			love.graphics.setCanvas()
 			love.graphics.present()
 		end
 
