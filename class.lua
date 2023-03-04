@@ -3,8 +3,10 @@
 local object = {}
 
 ---creates a new instance
+---@generic T : object
+---@param self T
 ---@param t table|nil to use as instance
----@return object
+---@return T
 function object:create(t)
 	local s = setmetatable(t or {}, self._mt)
 	return s
