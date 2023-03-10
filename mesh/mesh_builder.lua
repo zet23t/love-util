@@ -39,7 +39,7 @@ end
 ---@return ... 
 function mesh_builder:allocate_vertices(amount)
 	self.vertice_counter = self.vertice_counter + 1
-	if amount and amount > 0 then
+	if amount and amount > 1 then
 		return self.vertice_counter, self:allocate_vertices(amount - 1)
 	end
 
@@ -115,7 +115,7 @@ function mesh_builder:create_mesh()
 		attribute_normal_index = #attributes
 	end
 	if #self.uvs > 0 then
-		assert(vertice_data_count == #self.uvs / self.uv_size)
+		assert(vertice_data_count == #self.uvs / self.uv_size, "#uvs="..(#self.uvs / self.uv_size).." vertice_data_count="..vertice_data_count)
 		attributes[#attributes + 1] = { "VertexTexCoord", "float", self.uv_size }
 		attribute_uv_index = #attributes
 	end
