@@ -80,6 +80,10 @@ function entity_node:call(steps, ...)
 			if not self.is_enabled then
 				return
 			end
+		elseif mode == "filter" then
+			if step:filter_fn(self) then
+				return
+			end
 		elseif mode == "select" then
 			local name = step.name
 			for i = 1, #self.components do
