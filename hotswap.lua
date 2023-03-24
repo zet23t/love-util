@@ -12,7 +12,7 @@ local STOP_ALL = false
 local function safecall(f, ...)
 	return xpcall(f, function(err)
 		STOP_ALL = true
-		print(debug.traceback("ERROR: " .. err, 1))
+		print(debug.traceback("ERROR: " .. err, 3))
 	end, ...)
 end
 
@@ -37,7 +37,7 @@ end
 
 local function safe_reload()
 	xpcall(reload_all, function(msg)
-		print(debug.traceback("Error reloading:\n  " .. msg, 1))
+		print(debug.traceback("Error reloading:\n  " .. msg, 3))
 	end)
 end
 
