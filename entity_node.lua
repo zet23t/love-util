@@ -50,6 +50,15 @@ function entity_node:has_parent(parent)
 	return self.parent and self.parent:has_parent(parent)
 end
 
+function entity_node:remove_all_children()
+	for i=1,#self.children do
+		local child = self.children[i]
+		child.parent = nil
+		self.children[i] = nil
+	end
+	return self
+end
+
 function entity_node:remove()
 	local parent = self.parent
 	if not parent then return end
