@@ -1,5 +1,6 @@
-return function (t,...)
-	for i=1, select('#', ...) do
-		table.insert(t,select(i,...))
+return function(t, ...)
+	local index = #t
+	for i = 1, select('#', ...) do
+		t[i + index] = select(i, ...)
 	end
 end
