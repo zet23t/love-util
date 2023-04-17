@@ -3,4 +3,5 @@ return function(t, ...)
 	for i = 1, select('#', ...) do
 		t[i + index] = select(i, ...)
 	end
+	return t
 end
