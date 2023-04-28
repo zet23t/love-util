@@ -29,6 +29,28 @@ function entity_node:new(name)
 	}
 end
 
+---A query to search an entity in the entity nodes by name
+---@param path string[]
+function entity_node:query(path)
+	local node = self
+	for i=1,#path do
+		local name = path[i]
+		local next_node
+		for k=1,#node.children do
+			local child = node.children[k]
+			if child.name == name then
+				next_node = child
+				break
+			end
+		end
+		if not next_node then
+			return nil
+		end
+		node = next_node
+	end
+	return node
+end
+
 function entity_node:set_parent(parent)
 	parent:add_child(self)
 	return self
