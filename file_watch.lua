@@ -20,7 +20,9 @@ function file_watch:add(path, callback)
 	}
 	self.watches[#self.watches+1] = watch
 	check_watch(self, watch)
-	return self
+	return function ()
+		return callback(path)
+	end
 end
 
 function file_watch:remove(path)

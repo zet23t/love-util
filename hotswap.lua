@@ -157,3 +157,5 @@ function love.run()
 end
 
 scan_scripts(true)
+
+return reload_all
