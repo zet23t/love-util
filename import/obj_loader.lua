@@ -23,7 +23,8 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-]]--
+]]
+   --
 
 local path = ... .. "."
 local loader = {}
@@ -36,30 +37,6 @@ local function file_exists(file)
 	local f = io.open(file, "r")
 	if f then f:close() end
 	return f ~= nil
-end
-
--- http://wiki.interfaceware.com/534.html
-local function string_split(s, d)
-	local t = {}
-	local i = 0
-	local f
-	local match = '(.-)' .. d .. '()'
-	
-	if string.find(s, d) == nil then
-		return {s}
-	end
-	
-	for sub, j in string.gmatch(s, match) do
-		i = i + 1
-		t[i] = sub
-		f = j
-	end
-	
-	if i ~= 0 then
-		t[i+1] = string.sub(s, f)
-	end
-	
-	return t
 end
 
 function loader.load(file)
@@ -75,25 +52,57 @@ function loader.load(file)
 
 	local lines = {}
 
-	for line in get_lines(file) do 
+	for line in get_lines(file) do
 		table.insert(lines, line)
 	end
 
 	return loader.parse(lines)
 end
 
+local function split_by_whitespaces(line)
+	local pos = 1
+	local l = {}
+	while pos <= #line and line:byte(pos) <= 32 do pos = pos + 1 end
+	while pos <= #line do
+		local start = pos
+		while pos <= #line and line:byte(pos) > 32 do pos = pos + 1 end
+		local part = line:sub(start, pos - 1)
+		l[#l + 1] = part
+		while pos <= #line and line:byte(pos) <= 32 do pos = pos + 1 end
+	end
+	return l
+end
+
+local slash = ("/"):byte()
+local function split_by_slashes(line)
+	local pos = 1
+	local l = {}
+	while pos <= #line do
+		local start = pos
+		while pos <= #line and line:byte(pos) ~= slash do pos = pos + 1 end
+		local part = line:sub(start, pos - 1)
+		l[#l + 1] = part
+		while pos <= #line and line:byte(pos) == slash do pos = pos + 1 end
+	end
+	return l
+end
+
+---@param object string[]
+---@return table
 function loader.parse(object)
 	local obj = {
-		v	= {}, -- List of vertices - x, y, z, [w]=1.0
-		vt	= {}, -- Texture coordinates - u, v, [w]=0
-		vn	= {}, -- Normals - x, y, z
-		vp	= {}, -- Parameter space vertices - u, [v], [w]
-		f	= {}, -- Faces
+		v = {}, -- List of vertices - x, y, z, [w]=1.0
+		vt = {}, -- Texture coordinates - u, v, [w]=0
+		vn = {}, -- Normals - x, y, z
+		vp = {}, -- Parameter space vertices - u, [v], [w]
+		f = {}, -- Faces
 	}
 
-	for _, line in ipairs(object) do
-		local l = string_split(line, "%s+")
-		
+	for k = 1, #object do
+		local line = object[k]
+
+		local l = split_by_whitespaces(line)
+
 		if l[1] == "v" then
 			local v = {
 				x = tonumber(l[2]),
@@ -126,8 +135,8 @@ function loader.parse(object)
 		elseif l[1] == "f" then
 			local f = {}
 
-			for i=2, #l do
-				local split = string_split(l[i], "/")
+			for i = 2, #l do
+				local split = split_by_slashes(l[i])
 				local v = {}
 
 				v.v = tonumber(split[1])
@@ -143,6 +152,5 @@ function loader.parse(object)
 
 	return obj
 end
-
 
 return loader
