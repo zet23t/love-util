@@ -3,6 +3,7 @@ local class       = require "love-util.class"
 
 ---@class entity_component : object
 ---@field entity entity_node
+---@field component_type entity_component|nil
 
 ---@class entity_node : object An entity represents an element in a tree structure
 ---@field parent entity_node|nil
@@ -65,6 +66,30 @@ function entity_node:add_child(node)
 	node.parent = self
 	self.children[#self.children + 1] = node
 	return self
+end
+
+---@param func fun(node:entity_node, ...):boolean|nil breaks iteration when returning true
+function entity_node:for_each(func, ...)
+	if func(self, ...) then return true end
+	for i=1,#self.children do
+		if self.children[i]:for_each(func, ...) then
+			return true
+		end
+	end
+end
+
+---@param func fun(node:entity_component, ...):boolean|nil breaks iteration when returning true
+function entity_node:for_each_component(func, ...)
+	for i=1,#self.components do
+		if func(self.components[i], ...) then
+			return true
+		end
+	end
+	for i=1,#self.children do
+		if self.children[i]:for_each_component(func, ...) then
+			return true
+		end
+	end
 end
 
 function entity_node:has_parent(parent)
@@ -145,10 +170,23 @@ function entity_node:call(steps, ...)
 	end
 end
 
+local mode_ignore_disabled = { mode = "ignore_disabled" }
+local mode_children = { mode = "children" }
+local function mode_components_call(call) return { mode = "components", name = call } end
+
+local on_entity_node_enabled = { mode_ignore_disabled, mode_components_call "on_entity_node_enabled", mode_children }
+local on_entity_node_disabled = { mode_ignore_disabled, mode_components_call "on_entity_node_disabled", mode_children }
+
 function entity_node:set_enabled(enabled)
 	if self.is_enabled == enabled then return self end
+	if not enabled then
+		self:call(on_entity_node_disabled)
+	end
 	self.is_enabled = enabled
-	self:call_on_components(enabled and "on_entity_node_enabled" or "on_entity_node_disabled")
+	if enabled then
+		self:call(on_entity_node_enabled)
+	end
+
 	return self
 end
 
