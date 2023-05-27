@@ -8,7 +8,7 @@ local function desuffixed_pairs(t)
 		id = tonumber(id)
 		icon = tonumber(icon)
 		-- require "log"("%s %s %s %s",tostring(id),tostring(name),tostring(id), tostring(icon))
-		assert(id)
+		assert(id, k)
 		max_id = math.max(id, max_id or id)
 		values[(id)] = { name, v, icon }
 	end

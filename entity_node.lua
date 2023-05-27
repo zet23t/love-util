@@ -1,5 +1,5 @@
-local assert_type = require "love-util.assert_type"
-local class       = require "love-util.class"
+local assert_type      = require "love-util.assert_type"
+local class            = require "love-util.class"
 
 ---@class entity_component : object
 ---@field entity entity_node
@@ -12,9 +12,9 @@ local class       = require "love-util.class"
 ---@field component_data table
 ---@field is_enabled boolean
 ---@field name string
-local entity_node = class "entity_node"
+local entity_node      = class "entity_node"
 entity_node.is_enabled = true
-entity_node.name = "unnamed entity_node"
+entity_node.name       = "unnamed entity_node"
 
 local function call_on(t, name, ...)
 	if type(t[name]) ~= "function" then return false, t[name] end
@@ -34,10 +34,10 @@ end
 ---@param path string[]
 function entity_node:query(path)
 	local node = self
-	for i=1,#path do
+	for i = 1, #path do
 		local name = path[i]
 		local next_node
-		for k=1,#node.children do
+		for k = 1, #node.children do
 			local child = node.children[k]
 			if child.name == name then
 				next_node = child
@@ -71,21 +71,51 @@ end
 ---@param func fun(node:entity_node, ...):boolean|nil breaks iteration when returning true
 function entity_node:for_each(func, ...)
 	if func(self, ...) then return true end
-	for i=1,#self.children do
+	for i = 1, #self.children do
 		if self.children[i]:for_each(func, ...) then
 			return true
 		end
 	end
 end
 
+---returns a list of all entity parent names in order of hierarchy level
+---@return string[]
+function entity_node:get_name_path()
+	local path = {}
+	local node = self
+	repeat
+		table.insert(path, 1, node.name)
+		node = node.parent
+	until not node
+	return path
+end
+
+---retrieve element by name path
+---@param path string[]
+---@param index integer|nil
+---@return entity_node|nil
+function entity_node:get_by_path(path, index)
+	index = index or 1
+	if path[index] ~= self.name then return end
+	if index >= #path then return self end
+	for i = 1, #self.children do
+		local element = self.children[i]:get_by_path(path, index + 1)
+		if element then
+			return element
+		end
+	end
+
+	return nil
+end
+
 ---@param func fun(node:entity_component, ...):boolean|nil breaks iteration when returning true
 function entity_node:for_each_component(func, ...)
-	for i=1,#self.components do
+	for i = 1, #self.components do
 		if func(self.components[i], ...) then
 			return true
 		end
 	end
-	for i=1,#self.children do
+	for i = 1, #self.children do
 		if self.children[i]:for_each_component(func, ...) then
 			return true
 		end
@@ -98,7 +128,7 @@ function entity_node:has_parent(parent)
 end
 
 function entity_node:remove_all_children()
-	for i=1,#self.children do
+	for i = 1, #self.children do
 		local child = self.children[i]
 		child.parent = nil
 		self.children[i] = nil
@@ -153,8 +183,8 @@ function entity_node:call(steps, ...)
 						return
 					end
 				end
-				if not selected then 
-					return 
+				if not selected then
+					return
 				end
 			end
 		elseif mode == "components" then
