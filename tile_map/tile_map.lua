@@ -1,7 +1,7 @@
-
 ---@class tile_map : object
 ---@field tileset tileset
 ---@field types table<string, string> map of types at corners
+---@field surfacetypes table<string, string> map of surface types at corners
 ---@field heights table<string, integer> elevation of corners
 ---@field dirty table<string, integer[]>
 local tile_map = require "love-util.class" "tile_map"
@@ -9,14 +9,15 @@ local tile_map = require "love-util.class" "tile_map"
 ---@param ts tileset
 ---@return tile_map
 function tile_map:new(ts)
-    self = self:create {
-        tileset = ts,
-        types = {},
-        heights = {},
-        dirty = {},
-    }
-    self:init()
-    return self
+	self = self:create {
+		tileset = ts,
+		types = {},
+		surfacetypes = {},
+		heights = {},
+		dirty = {},
+	}
+	self:init()
+	return self
 end
 
 function tile_map:init()
@@ -27,101 +28,151 @@ end
 
 local version_identifier = "tilemap data version: 1"
 function tile_map:deserialize(content)
-    local header, names, data = content:match(("([^\n]+)[\n\r]?"):rep(3))
-    assert(header == version_identifier, "unexpected version version_identifier: '"..tostring(header).."'")
-    local floor_name_map = {}
-    for floor_name in names:gmatch "([^;]*);" do
-        floor_name_map[#floor_name_map+1] = floor_name
-    end
-    for key, x, y, name_id, height in data:gmatch"(([%d%-]+),([%d%-]+)),(%d+),([%d%-]+)" do
-        local floor_name = assert(floor_name_map[tonumber(name_id)])
-        height = assert(tonumber(height))
-        x,y = tonumber(x), tonumber(y)
-        self.types[key] = floor_name
-        self.heights[key] = height
-        self.dirty[key] = { x, y }
-    end
-    self:update_dirty()
+	local header, names, data = content:match(("([^\n]+)[\n\r]?"):rep(3))
+	assert(header == version_identifier, "unexpected version version_identifier: '" .. tostring(header) .. "'")
+	local floor_name_map = {}
+	for floor_name in names:gmatch "([^;]*);" do
+		floor_name_map[#floor_name_map + 1] = floor_name
+	end
+	for key, x, y, name_id, height in data:gmatch "(([%d%-]+),([%d%-]+)),(%d+),([%d%-]+)" do
+		local floor_name = assert(floor_name_map[tonumber(name_id)])
+		height = assert(tonumber(height))
+		x, y = tonumber(x), tonumber(y)
+		self.types[key] = floor_name
+		self.heights[key] = height
+		self.dirty[key] = { x, y }
+	end
+	self:update_dirty()
 end
 
 function tile_map:serialize()
-    local output = {version_identifier, "\n"}
-    local floor_name_map = {}
-    local i = 1
-    for name in pairs(self.tileset.floor_types) do
-        floor_name_map[name] = tostring(i)
-        output[#output+1] = name..";"
-        i = 1 + i
-    end
-    output[#output+1] = "\n"
-    for key,floor_type_name in pairs(self.types) do
-        output[#output+1] = key..","..floor_name_map[floor_type_name]..","..self.heights[key]..";"
-    end
-    return table.concat(output)
+	local output = { version_identifier, "\n" }
+	local floor_name_map = {}
+	local i = 1
+	for name in pairs(self.tileset.floor_types) do
+		floor_name_map[name] = tostring(i)
+		output[#output + 1] = name .. ";"
+		i = 1 + i
+	end
+	output[#output + 1] = "\n"
+	for key, floor_type_name in pairs(self.types) do
+		output[#output + 1] = key .. "," .. floor_name_map[floor_type_name] .. "," .. self.heights[key] .. ";"
+	end
+	return table.concat(output)
 end
 
 local function mkkey(x, y) return x .. "," .. y end
 local function mktypekey(t, delta) return t == "*" and "*" or (t .. "-" .. delta) end
 
 function tile_map:on_tile_does_not_exist(x, y, z, key_coordinate, tilekey)
-    error "overload on_tile_does_not_exist for functionality"
+	error "overload on_tile_does_not_exist for functionality"
 end
 
-function tile_map:on_update_tile(x, y, z, key_coordinate, tilekey, tile_info, tile_rotation)
-    error "overload on_update_tile for functionality"
+function tile_map:on_update_tile(x, y, z, key_coordinate, tilekey, tile_info, tile_rotation, surface_tiles)
+	error "overload on_update_tile for functionality"
 end
 
 function tile_map:update(x, y)
-    local a, b, c, d = mkkey(x + 1, y + 1), mkkey(x + 1, y), mkkey(x, y), mkkey(x, y + 1)
+	local a, b, c, d = mkkey(x + 1, y + 1), mkkey(x + 1, y), mkkey(x, y), mkkey(x, y + 1)
 
 
-    local types = self.types
-    local ta, tb, tc, td = types[a], types[b], types[c], types[d]
-    if not ta or not tb or not tc or not td then
-        return
-    end
-    local heights = self.heights
-    local ha, hb, hc, hd = heights[a], heights[b], heights[c], heights[d]
-    local fallback_height = ha or hb or hc or hd
-    ha, hb, hc, hd = ha or fallback_height, hb or fallback_height, hc or fallback_height, hd or fallback_height
-    local min = math.min(ha, hb, hc, hd)
-    local da, db, dc, dd = ha - min, hb - min, hc - min, hd - min
+	local types = self.types
+	local ta, tb, tc, td = types[a], types[b], types[c], types[d]
+	if not ta or not tb or not tc or not td then
+		return
+	end
+	local heights = self.heights
+	local ha, hb, hc, hd = heights[a], heights[b], heights[c], heights[d]
+	local fallback_height = ha or hb or hc or hd
+	ha, hb, hc, hd = ha or fallback_height, hb or fallback_height, hc or fallback_height, hd or fallback_height
+	local min = math.min(ha, hb, hc, hd)
+	local da, db, dc, dd = ha - min, hb - min, hc - min, hd - min
 
-    local tilekey = mktypekey(ta, da) .. ":" .. mktypekey(tb, db) .. ":" .. mktypekey(tc, dc) .. ":" .. mktypekey(td, dd)
-    local matches = self.tileset.lookup_table[tilekey]
+	local tilekey = mktypekey(ta, da) .. ":" .. mktypekey(tb, db) .. ":" .. mktypekey(tc, dc) .. ":" .. mktypekey(td, dd)
+	local matches = self.tileset.lookup_table[tilekey]
 
-    if not matches then
-        self:on_tile_does_not_exist(x,min,y,c,tilekey)
-        return
-    end
-    local rnd = ((x * 17 + y * 7 + 2348421) % 11493) % #matches + 1
-    local select = matches[rnd]
-    local tile_info = select.tile_info
-    local tile_rotation = select.rotation
-    self:on_update_tile(x, min, y, c, tilekey, tile_info, tile_rotation)
-    return true
+	if not matches then
+		self:on_tile_does_not_exist(x, min, y, c, tilekey)
+		return
+	end
+	local rnd = ((x * 17 + y * 7 + 2348421) % 11493) % #matches + 1
+	local select = matches[rnd]
+	local tile_info = select.tile_info
+	local tile_rotation = select.rotation
+
+	local surface_tiles = {}
+	
+	-- handling surfac tile types. These are special in some ways:
+	-- - they are flat; no height differences
+	-- - they can be combined (to decrease tile number complexity)
+	-- - we group corners of same height and type to find matches
+	local surfacetypes = self.surfacetypes
+	local sta, stb, stc, std = surfacetypes[a], surfacetypes[b], surfacetypes[c], surfacetypes[d]
+	local tracked = {}
+	local function handle_surface_tile(type, height)
+		if not type then return end
+		local ka = sta == type and da == height and "1" or "0"
+		local kb = stb == type and db == height and "1" or "0"
+		local kc = stc == type and dc == height and "1" or "0"
+		local kd = std == type and dd == height and "1" or "0"
+		local key = type.."-"..ka..kb..kc..kd
+		local track_key = height..key
+		if tracked[track_key] then return end
+		tracked[track_key] = true
+
+		local tile_infos = self.tileset.surface_lut[key]
+		print(key, tile_infos)
+		if tile_infos then
+			local rnd = ((x * 17 + y * 7 + 2348424) % 11447) % #tile_infos + 1
+			surface_tiles[#surface_tiles+1] = {tile_info = tile_infos[rnd], height = height}
+		end
+	end
+	handle_surface_tile(sta, da)
+	handle_surface_tile(stb, db)
+	handle_surface_tile(stc, dc)
+	handle_surface_tile(std, dd)
+	-- if sta ~= stb or db ~= da then
+	-- 	handle_surface_tile(sta, da)
+	-- end
+	-- if (sta ~= stc or dc ~= da) and (stb ~= stc or dc ~= db) then
+	-- 	handle_surface_tile(stc, dc)
+	-- end
+	-- if (sta ~= std or dd ~= da) and (stb ~= std or dd ~= db) and (stc ~= std or dd ~= hc) then
+	-- 	handle_surface_tile(std, dd)
+	-- end
+
+	self:on_update_tile(x, min, y, c, tilekey, tile_info, tile_rotation, surface_tiles)
+	return true
+end
+
+function tile_map:put_surface(x, y, type)
+	local key = mkkey(x, y)
+	if self.types[key] and self.surfacetypes[key] ~= type then
+		self.dirty[key] = { x, y }
+		self.surfacetypes[key] = type
+	end
 end
 
 function tile_map:put(x, y, type, height, no_overwrite)
-    local key = mkkey(x, y)
-    if not self.types[key] or (not no_overwrite and (self.types[key] ~= type or self.heights[key] ~= height)) then
-        self.types[key] = type
-        self.heights[key] = height
-        self.dirty[key] = { x, y }
-    end
+	local key = mkkey(x, y)
+	if not self.types[key] or (not no_overwrite and (self.types[key] ~= type or self.heights[key] ~= height)) then
+		self.types[key] = type
+		self.heights[key] = height
+		self.dirty[key] = { x, y }
+	end
 end
 
 function tile_map:update_dirty()
-    for k, v in pairs(self.dirty) do
-        local x, y = unpack(v)
-        local a = self:update(x, y)
-        local b = self:update(x - 1, y)
-        local c = self:update(x - 1, y - 1)
-        local d = self:update(x, y - 1)
-        --if a and b and c and d then
-        self.dirty[k] = nil
-        --end
-    end
+	for k, v in pairs(self.dirty) do
+		local x, y = unpack(v)
+		local a = self:update(x, y)
+		local b = self:update(x - 1, y)
+		local c = self:update(x - 1, y - 1)
+		local d = self:update(x, y - 1)
+		--if a and b and c and d then
+		self.dirty[k] = nil
+		--end
+	end
 end
 
 return tile_map
