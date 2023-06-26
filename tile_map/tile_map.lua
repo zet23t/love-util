@@ -27,22 +27,30 @@ function tile_map:dispose()
 end
 
 local version_identifier = "tilemap data version: 1"
-function tile_map:deserialize(content)
-	local header, names, data = content:match(("([^\n]+)[\n\r]?"):rep(3))
+function tile_map:deserialize(content, no_dirty_update)
+	local header, floor_names, surface_names, data = content:match(("([^\n]+)[\n\r]?"):rep(4))
 	assert(header == version_identifier, "unexpected version version_identifier: '" .. tostring(header) .. "'")
 	local floor_name_map = {}
-	for floor_name in names:gmatch "([^;]*);" do
+	local surface_name_map = {}
+	for floor_name in floor_names:gmatch "([^;]*);" do
 		floor_name_map[#floor_name_map + 1] = floor_name
 	end
-	for key, x, y, name_id, height in data:gmatch "(([%d%-]+),([%d%-]+)),(%d+),([%d%-]+)" do
+	for surface_name in surface_names:gmatch "([^;]*);" do
+		surface_name_map[#surface_name_map + 1] = surface_name
+	end
+	for key, x, y, name_id, height, surface_id in data:gmatch "(([%d%-]+),([%d%-]+)),(%d+),([%d%-]+),(%d+)" do
 		local floor_name = assert(floor_name_map[tonumber(name_id)])
+		local surface_name = surface_name_map[tonumber(surface_id)]
 		height = assert(tonumber(height))
 		x, y = tonumber(x), tonumber(y)
 		self.types[key] = floor_name
 		self.heights[key] = height
 		self.dirty[key] = { x, y }
+		self.surfacetypes[key] = surface_name
 	end
-	self:update_dirty()
+	if not no_dirty_update then
+		self:update_dirty()
+	end
 end
 
 function tile_map:serialize()
@@ -55,8 +63,17 @@ function tile_map:serialize()
 		i = 1 + i
 	end
 	output[#output + 1] = "\n"
+	i = 1
+	local surface_name_map = {}
+	for name in pairs(self.tileset.surface_types) do
+		surface_name_map[name] = tostring(i)
+		output[#output + 1] = name .. ";"
+		i = 1 + i
+	end
+	output[#output + 1] = "\n"
 	for key, floor_type_name in pairs(self.types) do
-		output[#output + 1] = key .. "," .. floor_name_map[floor_type_name] .. "," .. self.heights[key] .. ";"
+		local surface_type_name = self.surfacetypes[key]
+		output[#output + 1] = key .. "," .. floor_name_map[floor_type_name] .. "," .. self.heights[key]..",".. (surface_name_map[surface_type_name] or 0) .. ";"
 	end
 	return table.concat(output)
 end
@@ -72,6 +89,10 @@ function tile_map:on_update_tile(x, y, z, key_coordinate, tilekey, tile_info, ti
 	error "overload on_update_tile for functionality"
 end
 
+function tile_map:on_tile_remove(k)
+	error "overload on_update_tile for functionality"
+end
+
 function tile_map:update(x, y)
 	local a, b, c, d = mkkey(x + 1, y + 1), mkkey(x + 1, y), mkkey(x, y), mkkey(x, y + 1)
 
@@ -79,6 +100,7 @@ function tile_map:update(x, y)
 	local types = self.types
 	local ta, tb, tc, td = types[a], types[b], types[c], types[d]
 	if not ta or not tb or not tc or not td then
+		self:on_tile_remove(c)
 		return
 	end
 	local heights = self.heights
@@ -101,7 +123,7 @@ function tile_map:update(x, y)
 	local tile_rotation = select.rotation
 
 	local surface_tiles = {}
-	
+
 	-- handling surfac tile types. These are special in some ways:
 	-- - they are flat; no height differences
 	-- - they can be combined (to decrease tile number complexity)
@@ -115,16 +137,16 @@ function tile_map:update(x, y)
 		local kb = stb == type and db == height and "1" or "0"
 		local kc = stc == type and dc == height and "1" or "0"
 		local kd = std == type and dd == height and "1" or "0"
-		local key = type.."-"..ka..kb..kc..kd
-		local track_key = height..key
+		local key = type .. "-" .. ka .. kb .. kc .. kd
+		local track_key = height .. key
 		if tracked[track_key] then return end
 		tracked[track_key] = true
 
 		local tile_infos = self.tileset.surface_lut[key]
-		print(key, tile_infos)
+		-- print(key, tile_infos)
 		if tile_infos then
 			local rnd = ((x * 17 + y * 7 + 2348424) % 11447) % #tile_infos + 1
-			surface_tiles[#surface_tiles+1] = {tile_info = tile_infos[rnd], height = height}
+			surface_tiles[#surface_tiles + 1] = { tile_info = tile_infos[rnd], height = height }
 		end
 	end
 	handle_surface_tile(sta, da)
@@ -143,6 +165,28 @@ function tile_map:update(x, y)
 
 	self:on_update_tile(x, min, y, c, tilekey, tile_info, tile_rotation, surface_tiles)
 	return true
+end
+
+function tile_map:get_height(x,y, search_rad)
+	local height,dist_h
+	search_rad = search_rad or 1
+	for i=0,search_rad do
+		for sx = x - search_rad, x + search_rad do
+			for sy = y - search_rad, y + search_rad do
+				local key = mkkey(sx,sy)
+				local h = self.heights[key]
+				if h then
+					local dx,dy = sx - x, sy - y
+					local d = dx * dx + dy * dy
+					if not dist_h or d < dist_h then
+						height = h
+						dist_h = d
+					end
+				end
+			end
+		end
+	end
+	return height
 end
 
 function tile_map:put_surface(x, y, type)
