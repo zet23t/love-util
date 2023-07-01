@@ -28,16 +28,31 @@ end
 
 local version_identifier = "tilemap data version: 1"
 function tile_map:deserialize(content, no_dirty_update)
+	local bench = require "love-util.bench"
+
+	local deserialize_mark = bench:mark("deserialize_header")
+	
 	local header, floor_names, surface_names, data = content:match(("([^\n]+)[\n\r]?"):rep(4))
 	assert(header == version_identifier, "unexpected version version_identifier: '" .. tostring(header) .. "'")
 	local floor_name_map = {}
 	local surface_name_map = {}
+
+	deserialize_mark()
+
+
+	local deserialize_mark = bench:mark("deserialize_floor_names")
 	for floor_name in floor_names:gmatch "([^;]*);" do
 		floor_name_map[#floor_name_map + 1] = floor_name
 	end
+	deserialize_mark()
+
+	local deserialize_mark = bench:mark("deserialize_surface_names")
 	for surface_name in surface_names:gmatch "([^;]*);" do
 		surface_name_map[#surface_name_map + 1] = surface_name
 	end
+	deserialize_mark()
+
+	local deserialize_mark = bench:mark("deserialize_tile_data")
 	for key, x, y, name_id, height, surface_id in data:gmatch "(([%d%-]+),([%d%-]+)),(%d+),([%d%-]+),(%d+)" do
 		local floor_name = assert(floor_name_map[tonumber(name_id)])
 		local surface_name = surface_name_map[tonumber(surface_id)]
@@ -48,9 +63,16 @@ function tile_map:deserialize(content, no_dirty_update)
 		self.dirty[key] = { x, y }
 		self.surfacetypes[key] = surface_name
 	end
+	deserialize_mark()
+
 	if not no_dirty_update then
+		local deserialize_mark = bench:mark("deserialize_update_dirty")
 		self:update_dirty()
+		deserialize_mark()
 	end
+
+	
+	bench:flush_info()
 end
 
 function tile_map:serialize()
@@ -93,15 +115,23 @@ function tile_map:on_tile_remove(k)
 	error "overload on_update_tile for functionality"
 end
 
-function tile_map:update(x, y)
-	local a, b, c, d = mkkey(x + 1, y + 1), mkkey(x + 1, y), mkkey(x, y), mkkey(x, y + 1)
+function tile_map:update(x, y, update_map)
+	local mark = require "love-util.bench":mark("tile_map:update")
 
+	local a, b, c, d = mkkey(x + 1, y + 1), mkkey(x + 1, y), mkkey(x, y), mkkey(x, y + 1)
+	if update_map then
+		local tile_key = a..b..c..d
+		if update_map[tile_key] then
+			return
+		end
+		update_map[tile_key] = true
+	end
 
 	local types = self.types
 	local ta, tb, tc, td = types[a], types[b], types[c], types[d]
 	if not ta or not tb or not tc or not td then
 		self:on_tile_remove(c)
-		return
+		return mark()
 	end
 	local heights = self.heights
 	local ha, hb, hc, hd = heights[a], heights[b], heights[c], heights[d]
@@ -115,7 +145,7 @@ function tile_map:update(x, y)
 
 	if not matches then
 		self:on_tile_does_not_exist(x, min, y, c, tilekey)
-		return
+		return mark()
 	end
 	local rnd = ((x * 17 + y * 7 + 2348421) % 11493) % #matches + 1
 	local select = matches[rnd]
@@ -164,6 +194,7 @@ function tile_map:update(x, y)
 	-- end
 
 	self:on_update_tile(x, min, y, c, tilekey, tile_info, tile_rotation, surface_tiles)
+	mark()
 	return true
 end
 
@@ -207,16 +238,19 @@ function tile_map:put(x, y, type, height, no_overwrite)
 end
 
 function tile_map:update_dirty()
+	local mark = require "love-util.bench":mark("tile_map:update_dirty")
+	local update_map = {}
 	for k, v in pairs(self.dirty) do
 		local x, y = unpack(v)
-		local a = self:update(x, y)
-		local b = self:update(x - 1, y)
-		local c = self:update(x - 1, y - 1)
-		local d = self:update(x, y - 1)
+		local a = self:update(x, y, update_map)
+		local b = self:update(x - 1, y, update_map)
+		local c = self:update(x - 1, y - 1, update_map)
+		local d = self:update(x, y - 1, update_map)
 		--if a and b and c and d then
 		self.dirty[k] = nil
 		--end
 	end
+	mark()
 end
 
 return tile_map
