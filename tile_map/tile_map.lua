@@ -3,6 +3,7 @@
 ---@field types table<string, string> map of types at corners
 ---@field surfacetypes table<string, string> map of surface types at corners
 ---@field heights table<string, integer> elevation of corners
+---@field positions table<string, integer[]> coordinate pair for given key
 ---@field dirty table<string, integer[]>
 local tile_map = require "love-util.class" "tile_map"
 
@@ -12,6 +13,7 @@ function tile_map:new(ts)
 	self = self:create {
 		tileset = ts,
 		types = {},
+		positions = {},
 		surfacetypes = {},
 		heights = {},
 		dirty = {},
@@ -31,7 +33,7 @@ function tile_map:deserialize(content, no_dirty_update)
 	local bench = require "love-util.bench"
 
 	local deserialize_mark = bench:mark("deserialize_header")
-	
+
 	local header, floor_names, surface_names, data = content:match(("([^\n]+)[\n\r]?"):rep(4))
 	assert(header == version_identifier, "unexpected version version_identifier: '" .. tostring(header) .. "'")
 	local floor_name_map = {}
@@ -59,6 +61,7 @@ function tile_map:deserialize(content, no_dirty_update)
 		height = assert(tonumber(height))
 		x, y = tonumber(x), tonumber(y)
 		self.types[key] = floor_name
+		self.positions[key] = { x, y }
 		self.heights[key] = height
 		self.dirty[key] = { x, y }
 		self.surfacetypes[key] = surface_name
@@ -71,7 +74,7 @@ function tile_map:deserialize(content, no_dirty_update)
 		deserialize_mark()
 	end
 
-	
+
 	bench:flush_info()
 end
 
@@ -95,13 +98,15 @@ function tile_map:serialize()
 	output[#output + 1] = "\n"
 	for key, floor_type_name in pairs(self.types) do
 		local surface_type_name = self.surfacetypes[key]
-		output[#output + 1] = key .. "," .. floor_name_map[floor_type_name] .. "," .. self.heights[key]..",".. (surface_name_map[surface_type_name] or 0) .. ";"
+		output[#output + 1] = key ..
+		"," ..
+		floor_name_map[floor_type_name] ..
+		"," .. self.heights[key] .. "," .. (surface_name_map[surface_type_name] or 0) .. ";"
 	end
 	return table.concat(output)
 end
 
 local function mkkey(x, y) return x .. "," .. y end
-local function mktypekey(t, delta) return t == "*" and "*" or (t .. "-" .. delta) end
 
 function tile_map:on_tile_does_not_exist(x, y, z, key_coordinate, tilekey)
 	error "overload on_tile_does_not_exist for functionality"
@@ -120,7 +125,7 @@ function tile_map:update(x, y, update_map)
 
 	local a, b, c, d = mkkey(x + 1, y + 1), mkkey(x + 1, y), mkkey(x, y), mkkey(x, y + 1)
 	if update_map then
-		local tile_key = a..b..c..d
+		local tile_key = a .. b .. c .. d
 		if update_map[tile_key] then
 			return
 		end
@@ -140,7 +145,8 @@ function tile_map:update(x, y, update_map)
 	local min = math.min(ha, hb, hc, hd)
 	local da, db, dc, dd = ha - min, hb - min, hc - min, hd - min
 
-	local tilekey = mktypekey(ta, da) .. ":" .. mktypekey(tb, db) .. ":" .. mktypekey(tc, dc) .. ":" .. mktypekey(td, dd)
+	--local tilekey = mktypekey(ta, da) .. ":" .. mktypekey(tb, db) .. ":" .. mktypekey(tc, dc) .. ":" .. mktypekey(td, dd)
+	local tilekey = self.tileset:mktypekey_full(ta,tb,tc,td,da,db,dc,dd)
 	local matches = self.tileset.lookup_table[tilekey]
 
 	if not matches then
@@ -198,16 +204,16 @@ function tile_map:update(x, y, update_map)
 	return true
 end
 
-function tile_map:get_height(x,y, search_rad)
-	local height,dist_h
+function tile_map:get_height(x, y, search_rad)
+	local height, dist_h
 	search_rad = search_rad or 1
-	for i=0,search_rad do
+	for i = 0, search_rad do
 		for sx = x - search_rad, x + search_rad do
 			for sy = y - search_rad, y + search_rad do
-				local key = mkkey(sx,sy)
+				local key = mkkey(sx, sy)
 				local h = self.heights[key]
 				if h then
-					local dx,dy = sx - x, sy - y
+					local dx, dy = sx - x, sy - y
 					local d = dx * dx + dy * dy
 					if not dist_h or d < dist_h then
 						height = h

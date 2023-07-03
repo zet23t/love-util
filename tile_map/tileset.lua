@@ -92,6 +92,13 @@ local function insert_tile(tileset, name, corners, names, floor_types, variant, 
 	return tile_info
 end
 
+local function mktypekey(t, delta) return t == "*" and "*" or (t .. "-" .. delta) end
+
+function tileset:mktypekey_full(ta, tb, tc, td, da, db, dc, dd)
+	return mktypekey(ta, da or 0) ..
+	":" .. mktypekey(tb, db or 0) .. ":" .. mktypekey(tc, dc or 0) .. ":" .. mktypekey(td, dd or 0)
+end
+
 function tileset:add_tile_surface_type(name)
 	local type_name, corners, variant = name:match "ts_([^%-]*)%-(%d%d%d%d)%-(%d+)$"
 	if not type_name then
