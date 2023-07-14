@@ -80,6 +80,23 @@ local function scan_scripts(is_init)
 end
 
 local handlers = {}
+function handlers.touchmoved(id, x, y, dx, dy, pressure)
+	if love.touch_moved then
+		safecall(love.touch_moved, id, x, y, dx, dy, pressure)
+	end
+end
+
+function handlers.touchpressed(id, x, y, dx, dy, pressure)
+	if love.touch_pressed then
+		safecall(love.touch_pressed, id, x, y, dx, dy, pressure)
+	end
+end
+
+function handlers.touchreleased(id, x, y, dx, dy, pressure)
+	if love.touch_released then
+		safecall(love.touch_released, id, x, y, dx, dy, pressure)
+	end
+end
 
 function handlers.keypressed(key)
 	if key == "f5" then
@@ -122,6 +139,8 @@ function love.run()
 				end
 				if handlers[name] then
 					handlers[name](a, b, c, d, e, f)
+				else
+					-- print(name)
 				end
 				if not STOP_ALL then
 					safecall(love.handlers[name], a, b, c, d, e, f)
