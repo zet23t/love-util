@@ -30,7 +30,7 @@ local function corner_info(type, types)
 	local idx = math.floor(type / 2 + 1)
 	local level = type % 2
 	local type = assert(types[idx])
-	return { type = type, level = level, key = type .. "-" .. level }
+	return { type = type, level = level, key = type .. "-" .. level, idx = idx }
 end
 
 local function add_to_dictionary_list(dict, key, value)
