@@ -131,7 +131,7 @@ local tabs = {}
 						v = serialized_keys[k](v)
 					end
 					if type(v) == "function" then
-						local keypath = ""
+						local keypath = tostring(k)
 						for i = select('#', ...), 1, -1 do
 							keypath = keypath .. "." .. tostring(select(i, ...))
 						end
