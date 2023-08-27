@@ -104,6 +104,10 @@ local serialize_public = {}
 ---Serializes the table t into a string that can be loaded as lua code.
 ---Serialized objects will have their metatables restored as well, as long as these are
 ---registered under the same names.
+---Be aware that the Lua code has some limitations in regards of how many objects can
+---be loaded (limited number of constants). So serializing huge amounts of data might
+---not work. You'll only see that when you try to load the string, which means you may
+---lose data.
 ---@param t table
 ---@return string
 function serialize_public:serialize_to_string(t)
