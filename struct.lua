@@ -24,7 +24,8 @@
 -- reducing the amount of garbage created, not creating strings but writing
 -- into a table that is assumed to hold single byte values. This makes the API
 -- incompatible with the original, otherwise I would fork & improve it & submit
--- a pull request.
+-- a pull request. There were some quite large performance issues with the code
+-- due to aiming to be generic, which I don't really need.
 -- TODO: replace :find with something more efficient
 
 
@@ -34,24 +35,64 @@ local struct = {}
 
 local function append_string(stream, str)
     local start = #stream
-    for i=1,#str do
-        stream[start+i] = string.char(str:byte(i))
+    for i = 1, #str do
+        stream[start + i] = string.char(str:byte(i))
     end
 end
 
 local function append_table(stream, tab)
     local start = #stream
-    for i=1,#tab do
-        stream[start+i] = tab[i]
+    for i = 1, #tab do
+        stream[start + i] = tab[i]
     end
 end
 
 local function append_table_reversed(stream, tab)
-    local start = #stream+1
+    local start = #stream + 1
     local len = #tab
-    for i=0,#tab-1 do
-        stream[start+i] = tab[len-i]
+    for i = 0, #tab - 1 do
+        stream[start + i] = tab[len - i]
     end
+end
+
+function struct.packIE(stream, val)
+    local offset = #stream
+    local a = val % 0x100
+    local rest = (val - a) / 0x100
+    local b = rest % 0x100
+    rest = (rest - b) / 0x100
+    local c = rest % 0x100
+    rest = (rest - c) / 0x100
+    local d = rest
+    stream[offset+1], stream[offset+2], stream[offset+3], stream[offset+4] = string.char(a,b,c,d)
+end
+
+function struct.packdE(stream, val)
+    local sign = 0
+
+    if val < 0 then
+        sign = 1
+        val = -val
+    end
+
+    local mantissa, exponent = math.frexp(val)
+    if val == 0 then
+        mantissa = 0
+        exponent = 0
+    else
+        mantissa = (mantissa * 2 - 1) * math.ldexp(0.5, 53)
+        exponent = exponent + 1022
+    end
+
+    val = mantissa
+    for i = 1, 6 do
+        table.insert(stream, string.char(math.floor(val) % (0x100)))
+        val = math.floor(val / (0x100))
+    end
+
+    table.insert(stream, string.char(math.floor(exponent * 16 + val) % (0x100)))
+    val = math.floor((exponent * 16 + val) / (0x100))
+    table.insert(stream, string.char(math.floor(sign * 128 + val) % (0x100)))
 end
 
 ---format is expected to be a string, which may contain the following format codes:
@@ -163,6 +204,38 @@ function struct.pack(format, stream, ...)
     end
 end
 
+function struct.unpackI(stream, pos)
+    local val = string.byte(stream, pos) + string.byte(stream, pos + 1) * 0x100 +
+        string.byte(stream, pos + 2) * 0x10000 + string.byte(stream, pos + 3) * 0x1000000
+    return val
+end
+
+function struct.unpackd(stream, pos)
+    local iterator = pos
+    local n = 8
+    local x = stream:sub(iterator, iterator + n - 1)
+    iterator = iterator + n
+
+    local sign = 1
+    local mantissa = string.byte(x, 7) % 16
+    for j = n - 2, 1, -1 do
+        mantissa = mantissa * (0x100) + string.byte(x, j)
+    end
+
+    if string.byte(x, n) > 127 then
+        sign = -1
+    end
+
+    local exponent = (string.byte(x, n) % 128) * 16 +
+        math.floor(string.byte(x, n - 1) / 16)
+    local val = 0
+    if exponent ~= 0 then
+        mantissa = (math.ldexp(mantissa, -52) + 1) * sign
+        val = math.ldexp(mantissa, exponent - 1023)
+    end
+    return val
+end
+
 function struct.unpack(format, stream, pos)
     local vars = {}
     local iterator = pos or 1
@@ -175,13 +248,51 @@ function struct.unpack(format, stream, pos)
             endianness = true
         elseif opt == '>' then
             endianness = false
+            -- defining some fast paths for the most common cases (I and d) of my serializer
+        elseif opt == 'I' and endianness then
+            local val = string.byte(stream, iterator) + string.byte(stream, iterator + 1) * 0x100 +
+            string.byte(stream, iterator + 2) * 0x10000 + string.byte(stream, iterator + 3) * 0x1000000
+            if #format == 1 then
+                return val
+            end
+            table.insert(vars, val)
+        elseif opt == "d" then
+            local n = 8
+            local x = stream:sub(iterator, iterator + n - 1)
+            iterator = iterator + n
+
+            if not endianness then
+                x = string.reverse(x)
+            end
+
+            local sign = 1
+            local mantissa = string.byte(x, 7) % 16
+            for j = n - 2, 1, -1 do
+                mantissa = mantissa * (0x100) + string.byte(x, j)
+            end
+
+            if string.byte(x, n) > 127 then
+                sign = -1
+            end
+
+            local exponent = (string.byte(x, n) % 128) * 16 +
+                math.floor(string.byte(x, n - 1) / 16)
+            local val = 0
+            if exponent ~= 0 then
+                mantissa = (math.ldexp(mantissa, -52) + 1) * sign
+                val = math.ldexp(mantissa, exponent - 1023)
+            end
+            if #format == 1 then
+                return val
+            end
+            table.insert(vars, val)
         elseif opt:find('[bBhHiIlL]') then
             local n = opt:find('[hH]') and 2 or opt:find('[iI]') and 4 or opt:find('[lL]') and 8 or 1
             local signed = opt:lower() == opt
 
             local val = 0
             for j = 1, n do
-                local byte = string.byte(stream,iterator)
+                local byte = string.byte(stream, iterator)
                 if endianness then
                     val = val + byte * (2 ^ ((j - 1) * 8))
                 else

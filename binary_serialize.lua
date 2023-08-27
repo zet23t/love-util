@@ -45,13 +45,7 @@ end
 
 local function write_uint32(out, int)
     local addr = #out + 1
-    struct.pack("I", out, int)
-    return addr
-end
-
-local function write_int32(out, int)
-    local addr = #out + 1
-    struct.pack("i", out, int)
+    struct.packIE(out, int)
     return addr
 end
 
@@ -91,7 +85,7 @@ local function write_any(out, tabs, strings, v)
     elseif vtype == "table" then
         write_uint32(out, tabs[v])
     elseif vtype == "number" then
-        struct.pack("d", out, v)
+        struct.packdE(out, v)
     elseif vtype == "nil" then
         -- nothing to do
     elseif vtype == "b" then
@@ -161,13 +155,13 @@ local function read_any(bytes, pos, tabs, strings)
     local value
     pos = pos + 1
     if vtype == "n" then
-        value = struct.unpack("d", bytes, pos)
+        value = struct.unpackd(bytes, pos)
         pos = pos + 8
     elseif vtype == "s" then
-        value = strings[struct.unpack("I", bytes, pos)]
+        value = strings[struct.unpackI(bytes, pos)]
         pos = pos + 4
     elseif vtype == "t" then
-        value = tabs[struct.unpack("I", bytes, pos)]
+        value = tabs[struct.unpackI(bytes, pos)]
         pos = pos + 4
     elseif vtype == "F" then
         value = false
@@ -186,12 +180,12 @@ end
 function binary_serialize:deserialize(bytes)
     local tabs, strings = {}, {}
     local pos = 5
-    for i = 1, struct.unpack("I", bytes, 1) do
-        local len = struct.unpack("I", bytes, pos)
+    for i = 1, struct.unpackI(bytes, 1) do
+        local len = struct.unpackI(bytes, pos)
         strings[i] = bytes:sub(pos + 4, pos + 3 + len)
         pos = pos + len + 4
     end
-    local tab_cnt = struct.unpack("I", bytes, pos)
+    local tab_cnt = struct.unpackI(bytes, pos)
     pos = pos + 4
     for i = 1, tab_cnt do
         tabs[i] = {}
@@ -200,9 +194,9 @@ function binary_serialize:deserialize(bytes)
     -- which I don't want to use), we delay metatable assignments
     local meta_tabs = {}
     for i = 1, tab_cnt do
-        local mt_addr = struct.unpack("I", bytes, pos)
+        local mt_addr = struct.unpackI(bytes, pos)
         if mt_addr == 0xffffffff then
-            local mt_name = struct.unpack("I", bytes, pos + 4)
+            local mt_name = struct.unpackI(bytes, pos + 4)
             pos = pos + 8
             local class_name = strings[mt_name]
             local class = class_registry[class_name]
@@ -210,7 +204,6 @@ function binary_serialize:deserialize(bytes)
                 error("unknown class in serialization data: " .. class_name)
             end
             tabs[i] = class
-            print("DESEREIALIZED ",i, class_name, class, tabs[i])
         else
             pos = pos + 4
             local t = tabs[i]
@@ -218,12 +211,12 @@ function binary_serialize:deserialize(bytes)
                 local mt = tabs[mt_addr]
                 meta_tabs[t] = mt
             end
-            local len = struct.unpack("I", bytes, pos)
+            local len = struct.unpackI(bytes, pos)
             pos = pos + 4
             for j = 1, len do
                 pos, t[j] = read_any(bytes, pos, tabs, strings)
             end
-            local kcnt = struct.unpack("I", bytes, pos)
+            local kcnt = struct.unpackI(bytes, pos)
             pos = pos + 4
             for j = 1, kcnt do
                 local k
@@ -235,7 +228,7 @@ function binary_serialize:deserialize(bytes)
     for t, mt in pairs(meta_tabs) do
         setmetatable(t, mt)
     end
-    local root_index = struct.unpack("I", bytes, pos)
+    local root_index = struct.unpackI(bytes, pos)
     return tabs[root_index]
 end
 
