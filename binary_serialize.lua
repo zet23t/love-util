@@ -95,6 +95,9 @@ local function write_any(out, tabs, strings, v)
     end
 end
 
+---serializes the data to a stream of bytes using a table - use table.concat to get a string
+---@param tab table
+---@return table stream of bytes
 function binary_serialize:serialize(tab)
     local tabs, strings = {}, {}
     collect_tables(tab, tabs)

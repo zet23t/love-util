@@ -8,6 +8,7 @@ return function(t)
 			return copy_map[t]
 		end
 		local c = {}
+		setmetatable(c, getmetatable(t))
 		copy_map[t] = c
 		for k,v in pairs(t) do
 			c[copy(k)] = copy(v)

@@ -12,8 +12,10 @@ local function desuffixed_pairs(t)
 		max_id = math.max(id, max_id or id)
 		values[(id)] = { name, v, icon }
 	end
+	if #values == 0 then return function()end end
+
 	local i = 0
-	
+
 	return function()
 		repeat
 			i = i + 1
